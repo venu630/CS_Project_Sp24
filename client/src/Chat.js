@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import ScrollToBottom from "react-scroll-to-bottom";
 import { AES, enc, SHA256 } from "crypto-js";
 
@@ -7,15 +7,22 @@ function Chat({ socket, username, room }) {
   const [currentMessage, setCurrentMessage] = useState("");
   const [messageList, setMessageList] = useState([]);
   const iv = "initial-vector"; //store in ENV file
-  // const key = "sectet-key";
-  const [key, setKey] = useState("sectet-key")
+
+  const generateKey = (index) => {
+    const key = "secret-key";
+    return SHA256(key + index).toString();
+  };
+
+  const [key, setKey] = useState(generateKey(0));
   
   useEffect(() => {
-    console.log("message list length",messageList.length % 4)
-    if(messageList.length % 4 === 0){
-      setKey("new secret-key")
-    }
-  }, [messageList.length])
+    const intervalId = setInterval(() => {
+      const newIndex = Math.floor(Date.now() / (100 * 60 * 10 )); // Change key every 2 sec
+      setKey(generateKey(newIndex));
+    }, 60000); // Update key every 2 sec
+
+    return () => clearInterval(intervalId);
+  }, [messageList.length]);
 
   const sendMessage = async () => {
     if (currentMessage !== "") {
@@ -29,7 +36,7 @@ function Chat({ socket, username, room }) {
           new Date(Date.now()).getMinutes(),
       };
 
-      let cipherMessage = Encrypt(currentMessage);
+      let cipherMessage = Encrypt(currentMessage, key);
 
       const encryptedMessageData = {
         ...messageData,
@@ -43,31 +50,35 @@ function Chat({ socket, username, room }) {
     }
   };
 
-  const Encrypt = (message) => {
-    console.log("key", key);
+  const Encrypt = (message, key) => {
+    console.log("Encrypt key", key);
     return AES.encrypt(message, key, { iv: iv }).toString();
   };
 
-  const Decrypt = (message) => {
-    console.log("key", key);
+  const Decrypt = (message, key) => {
+    console.log("Decrypt key", key);
     return AES.decrypt(message, key, { iv: iv }).toString(enc.Utf8);
   };
 
   useEffect(() => {
     socket.on("receive_message", (data) => {
       let encryptedMessageData = data;
-      let decryptedMessage = Decrypt(data.message);
-      const decryptedMessageData = {
-        ...data,
-        message: decryptedMessage,
-      };
-      setMessageList((list) => [
-        ...list,
-        decryptedMessageData,
-        encryptedMessageData,
-      ]);
+      let decryptedMessage = Decrypt(data.message, key);
+
+        const decryptedMessageData = {
+          ...data,
+          message: decryptedMessage,
+        };
+        setMessageList((list) => [
+          ...list,
+          decryptedMessageData,
+          encryptedMessageData,
+        ]);
+
     });
-  }, [socket]);
+
+    return () => socket.off("receive_message");
+  }, [socket, key]);
 
   return (
     <div className="chat-window">
