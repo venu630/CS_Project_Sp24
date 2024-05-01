@@ -1,57 +1,71 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import ScrollToBottom from "react-scroll-to-bottom";
-import { AES, enc } from 'crypto-js';
+import { AES, enc, SHA256 } from "crypto-js";
+
 
 function Chat({ socket, username, room }) {
   const [currentMessage, setCurrentMessage] = useState("");
   const [messageList, setMessageList] = useState([]);
   const iv = "initial-vector"; //store in ENV file
-  const key = "secret-key" //store in ENV file
+  // const key = "sectet-key";
+  const [key, setKey] = useState("sectet-key")
+  
+  useEffect(() => {
+    console.log("message list length",messageList.length % 4)
+    if(messageList.length % 4 === 0){
+      setKey("new secret-key")
+    }
+  }, [messageList.length])
 
   const sendMessage = async () => {
-
     if (currentMessage !== "") {
-
       const messageData = {
         room: room,
         author: username,
         message: currentMessage,
         time:
-        new Date(Date.now()).getHours() +
-        ":" +
-        new Date(Date.now()).getMinutes(),
+          new Date(Date.now()).getHours() +
+          ":" +
+          new Date(Date.now()).getMinutes(),
       };
 
-      setMessageList((list) => [...list, messageData]);
-      
       let cipherMessage = Encrypt(currentMessage);
 
-    const encryptedMessageData = {
-      ...messageData, 
-      message: cipherMessage,
-    };
+      const encryptedMessageData = {
+        ...messageData,
+        message: cipherMessage,
+      };
+
+      setMessageList((list) => [...list, messageData, encryptedMessageData]);
       await socket.emit("send_message", encryptedMessageData);
       setCurrentMessage("");
+
     }
   };
 
   const Encrypt = (message) => {
+    console.log("key", key);
     return AES.encrypt(message, key, { iv: iv }).toString();
-  }
+  };
 
   const Decrypt = (message) => {
-    return AES.decrypt(message, key, {iv: iv}).toString(enc.Utf8);
-  }
+    console.log("key", key);
+    return AES.decrypt(message, key, { iv: iv }).toString(enc.Utf8);
+  };
 
   useEffect(() => {
     socket.on("receive_message", (data) => {
-      
-      let decryptedMessage = Decrypt(data.message)
+      let encryptedMessageData = data;
+      let decryptedMessage = Decrypt(data.message);
       const decryptedMessageData = {
-        ...data, 
+        ...data,
         message: decryptedMessage,
       };
-      setMessageList((list) => [...list, decryptedMessageData]);
+      setMessageList((list) => [
+        ...list,
+        decryptedMessageData,
+        encryptedMessageData,
+      ]);
     });
   }, [socket]);
 
