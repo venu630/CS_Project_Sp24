@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState,useCallback } from "react";
 import ScrollToBottom from "react-scroll-to-bottom";
 import { AES, enc, SHA256 } from "crypto-js";
 
@@ -8,21 +8,20 @@ function Chat({ socket, username, room }) {
   const [messageList, setMessageList] = useState([]);
   const iv = "initial-vector"; //store in ENV file
 
-  const generateKey = (index) => {
-    const key = "secret-key";
-    return SHA256(key + index).toString();
-  };
+  const generateKey = useCallback((index) => {
+    return SHA256(room + index).toString();
+  },[room]);
 
   const [key, setKey] = useState(generateKey(0));
   
   useEffect(() => {
     const intervalId = setInterval(() => {
-      const newIndex = Math.floor(Date.now() / (100 * 60 * 10 )); // Change key every 2 sec
+      const newIndex = Math.floor(Date.now() / (100 * 60 * 10 ));
       setKey(generateKey(newIndex));
-    }, 60000); // Update key every 2 sec
+    }, 60000); // Update key every 1 min
 
     return () => clearInterval(intervalId);
-  }, [messageList.length]);
+  }, [generateKey]);
 
   const sendMessage = async () => {
     if (currentMessage !== "") {
