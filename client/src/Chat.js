@@ -52,12 +52,14 @@ function Chat({ socket, username, room }) {
 
   const Encrypt = (message, key) => {
     console.log("Encrypt key", key);
-    return AES.encrypt(message, key, { iv: iv }).toString();
+    const padded = enc.Utf8.parse(message).toString(enc.Base64);
+    return AES.encrypt(padded, key, { iv: iv }).toString();
   };
-
+  
   const Decrypt = (message, key) => {
     console.log("Decrypt key", key);
-    return AES.decrypt(message, key, { iv: iv }).toString(enc.Utf8);
+    const unpadded = enc.Base64.parse(AES.decrypt(message, key, { iv: iv }).toString(enc.Utf8)).toString(enc.Utf8);
+    return unpadded;
   };
 
   useEffect(() => {
